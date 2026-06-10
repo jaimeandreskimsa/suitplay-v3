@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0b6e4f">
+<title>SuitPlay Pro — Analizador de combinaciones de palo</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --ink: #1a2433; --muted: #66748a;
+    --accent: #0b6e4f; --accent-soft: #e3f2ec;
+    --north: #1d5fbf; --north-soft: #e3edfb;
+    --south: #b34700; --south-soft: #fbeee3;
+    --ew: #8a94a6; --ew-soft: #eceff3;
+    --line: #dde3ea; --felt: #0d5c40;
+    --mono: "Cascadia Code", "Consolas", "SF Mono", monospace;
+    --sans: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font-family: var(--sans); font-size: 15px; line-height: 1.45; }
+  header { background: linear-gradient(135deg, #0b3d2e 0%, #0b6e4f 70%, #11875f 100%);
+           color: #fff; padding: 14px 24px; display: flex; align-items: center;
+           gap: 14px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 21px; font-weight: 650; }
+  header h1 .pips { font-size: 18px; letter-spacing: 2px; }
+  header .sub { opacity: .8; font-size: 12.5px; }
+  .userbox { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .credits-chip { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.3);
+                  padding: 4px 12px; border-radius: 20px; font-weight: 650; cursor: pointer; }
+  .credits-chip b { font-family: var(--mono); }
+  .userbox button { background: transparent; border: 1px solid rgba(255,255,255,.4);
+                    color: #fff; padding: 5px 12px; border-radius: 8px; font-size: 12.5px; cursor: pointer; }
+  main { max-width: 1180px; margin: 22px auto; padding: 0 20px;
+         display: grid; grid-template-columns: 430px 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 980px) { main { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+           padding: 18px 20px; box-shadow: 0 1px 3px rgba(20,35,60,.06); margin-bottom: 20px; }
+  .panel h2 { margin: 0 0 12px; font-size: 13px; font-weight: 700;
+              text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
+  .deck { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 12px; }
+  .chip { width: 38px; height: 48px; border-radius: 8px; border: 1.5px solid var(--line);
+          font: 600 17px var(--mono); cursor: pointer; user-select: none;
+          display: flex; align-items: center; justify-content: center;
+          background: var(--ew-soft); color: var(--ew); transition: all .12s; }
+  .chip:hover { transform: translateY(-2px); box-shadow: 0 3px 8px rgba(20,35,60,.15); }
+  .chip.north { background: var(--north-soft); color: var(--north); border-color: var(--north); }
+  .chip.south { background: var(--south-soft); color: var(--south); border-color: var(--south); }
+  .legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--muted);
+            margin-bottom: 14px; flex-wrap: wrap; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px;
+         margin-right: 5px; vertical-align: -1px; }
+  .hands { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px;
+           font-family: var(--mono); font-size: 16px; margin-bottom: 14px; }
+  .hands .who { color: var(--muted); font-family: var(--sans); font-size: 13px; padding-top: 2px; }
+  .hands .cards-n { color: var(--north); font-weight: 600; }
+  .hands .cards-s { color: var(--south); font-weight: 600; }
+  .hands .cards-ew { color: var(--ew); font-weight: 600; }
+  .opts { display: flex; gap: 16px; align-items: end; flex-wrap: wrap; margin-bottom: 14px; }
+  .opts label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
+  .opts input { width: 72px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px;
+                font: 600 15px var(--mono); color: var(--ink); background: #fff; }
+  button.calc { background: var(--accent); border: none; color: #fff; font: 650 15px var(--sans);
+                padding: 11px 26px; border-radius: 9px; cursor: pointer; }
+  button.calc:hover { background: #0d8560; }
+  button.calc:disabled { background: #9db8ad; cursor: default; }
+  button.ghost { background: #fff; border: 1px solid var(--line); color: var(--muted);
+                 font: 600 13px var(--sans); padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+  button.ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button.ghost:disabled { opacity: .45; cursor: default; }
+  .warn { font-size: 12.5px; color: #9a6700; background: #fff8e5; border: 1px solid #f0dca6;
+          border-radius: 8px; padding: 8px 12px; margin-top: 10px; }
+  .err { font-size: 13px; color: #b3261e; margin-top: 10px; }
+  .calcstate { display: none; align-items: center; gap: 12px; margin-top: 14px;
+               color: var(--muted); font-size: 14px; }
+  .calcstate.on { display: flex; }
+  .spinner { width: 22px; height: 22px; border-radius: 50%;
+             border: 3px solid var(--accent-soft); border-top-color: var(--accent);
+             animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { padding: 6px 12px; text-align: right; font-variant-numeric: tabular-nums; }
+  th { color: var(--muted); font-size: 12px; text-transform: uppercase;
+       letter-spacing: .6px; border-bottom: 2px solid var(--line); }
+  td { border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: none; }
+  td.l, th.l { text-align: left; }
+  td.mono { font-family: var(--mono); font-size: 14px; }
+  .goal-table td.goal { font-weight: 700; }
+  .lines-badge { display: inline-block; background: var(--accent-soft); color: var(--accent);
+                 font: 700 13px var(--mono); padding: 1px 8px; border-radius: 6px; margin-left: 2px; }
+  .we-table { font-family: var(--mono); }
+  .we-table td.l { letter-spacing: 1px; }
+  .we-table td.tr3 { color: var(--accent); font-weight: 700; }
+  .we-table td.dim { color: var(--muted); }
+  .lineinfo { margin-top: 14px; font-size: 13px; color: var(--muted); }
+  .lineinfo b { color: var(--ink); font-family: var(--mono); }
+  .play-head { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .play-head label { font-size: 13px; color: var(--muted); }
+  .play-head select { padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px;
+                      font: 700 15px var(--mono); color: var(--accent); background: #fff; cursor: pointer; }
+  .play-stats { font-size: 13px; color: var(--muted); margin-left: auto; text-align: right; }
+  .play-stats b { color: var(--ink); font-size: 15px; }
+  .felt { background: radial-gradient(ellipse at center, #11744f 0%, var(--felt) 80%);
+          border-radius: 12px; padding: 10px; margin-bottom: 12px;
+          display: grid; grid-template-areas: ". n ." "w c e" ". s .";
+          grid-template-columns: 1fr auto 1fr; gap: 6px; min-height: 190px;
+          align-items: center; justify-items: center; }
+  .seat { color: #cfe8dd; font-size: 11px; text-align: center; }
+  .seat .pcard { width: 44px; height: 58px; border-radius: 7px; margin: 3px auto 0;
+                 background: #fff; color: var(--ink); font: 700 22px var(--mono);
+                 display: flex; align-items: center; justify-content: center;
+                 box-shadow: 0 2px 5px rgba(0,0,0,.35); }
+  .seat .pcard.empty { background: rgba(255,255,255,.12); color: rgba(255,255,255,.45);
+                       box-shadow: none; border: 1px dashed rgba(255,255,255,.35); }
+  .seat.n { grid-area: n; } .seat.s { grid-area: s; }
+  .seat.w { grid-area: w; } .seat.e { grid-area: e; }
+  .seat.c { grid-area: c; color: #eaf6f0; font-size: 13px; }
+  .seat .rem { font-family: var(--mono); font-size: 13px; letter-spacing: 1px; color: #eaf6f0; }
+  .play-msg { font-size: 14px; margin-bottom: 10px; }
+  .play-msg .turn { font-weight: 650; }
+  .opt-cards { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .opt-card { min-width: 40px; height: 50px; border-radius: 8px; padding: 0 8px;
+              border: 1.5px solid var(--ew); background: #fff; color: var(--ink);
+              font: 700 17px var(--mono); cursor: pointer; }
+  .opt-card:hover { border-color: var(--accent); color: var(--accent); }
+  .opt-card small { display: block; font: 400 9.5px var(--sans); color: var(--muted); }
+  .play-ctl { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .play-log { font-family: var(--mono); font-size: 12.5px; color: var(--muted);
+              max-height: 150px; overflow-y: auto; border-top: 1px solid var(--line); padding-top: 8px; }
+  .play-log .win-ns { color: var(--accent); font-weight: 700; }
+  .play-log .win-ew { color: #b3261e; font-weight: 700; }
+  .play-done { background: var(--accent-soft); color: var(--accent); font-weight: 650;
+               border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; }
+  .empty { color: var(--muted); font-size: 14px; padding: 30px 0; text-align: center; }
+  footer { max-width: 1180px; margin: 10px auto 30px; padding: 0 20px;
+           font-size: 12px; color: var(--muted); }
+  /* ---------- auth ---------- */
+  .auth-screen { position: fixed; inset: 0; z-index: 50;
+                 background: linear-gradient(135deg, #0b3d2e 0%, #0b6e4f 60%, #11875f 100%);
+                 display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .auth-card { background: #fff; border-radius: 16px; padding: 34px 36px; width: 380px;
+               max-width: 100%; box-shadow: 0 18px 60px rgba(0,0,0,.35); }
+  .auth-card h1 { margin: 0 0 4px; font-size: 26px; color: var(--accent); }
+  .auth-card .tag { color: var(--muted); font-size: 13.5px; margin-bottom: 22px; }
+  .auth-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--line); margin-bottom: 18px; }
+  .auth-tabs button { flex: 1; background: none; border: none; padding: 10px;
+                      font: 650 14px var(--sans); color: var(--muted); cursor: pointer;
+                      border-bottom: 3px solid transparent; margin-bottom: -2px; }
+  .auth-tabs button.on { color: var(--accent); border-bottom-color: var(--accent); }
+  .auth-card label { display: block; font-size: 12.5px; color: var(--muted); margin: 12px 0 4px; }
+  .auth-card input { width: 100%; padding: 11px 12px; border: 1px solid var(--line);
+                     border-radius: 9px; font-size: 15px; }
+  .auth-card input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  .auth-card .submit { width: 100%; margin-top: 20px; background: var(--accent); border: none;
+                       color: #fff; padding: 13px; border-radius: 10px; font: 650 15px var(--sans);
+                       cursor: pointer; }
+  .auth-card .submit:disabled { background: #9db8ad; }
+  .auth-card .freebie { margin-top: 14px; font-size: 12.5px; color: var(--muted); text-align: center; }
+  .auth-err { color: #b3261e; font-size: 13px; margin-top: 12px; min-height: 18px; }
+  /* ---------- paywall ---------- */
+  .modal-bg { position: fixed; inset: 0; background: rgba(10,20,30,.55); z-index: 60;
+              display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .modal { background: #fff; border-radius: 16px; padding: 28px 30px; width: 460px; max-width: 100%; }
+  .modal h2 { margin: 0 0 6px; font-size: 20px; color: var(--ink); }
+  .modal .sub2 { color: var(--muted); font-size: 13.5px; margin-bottom: 18px; }
+  .plan { display: flex; align-items: center; gap: 14px; border: 1.5px solid var(--line);
+          border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; }
+  .plan:hover { border-color: var(--accent); }
+  .plan .pname { font-weight: 650; }
+  .plan .pcred { color: var(--muted); font-size: 12.5px; }
+  .plan .pprice { margin-left: auto; font: 700 18px var(--mono); color: var(--accent); }
+  .modal .close { margin-top: 8px; width: 100%; }
+  .pay-msg { font-size: 13px; color: var(--muted); background: var(--ew-soft);
+             border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- ==================== AUTH ==================== -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <h1><span style="letter-spacing:2px">♠♥♦♣</span> SuitPlay Pro</h1>
+    <div class="tag">Análisis exacto de combinaciones de palo</div>
+    <div class="auth-tabs">
+      <button id="tabLogin" class="on">Iniciar sesión</button>
+      <button id="tabRegister">Crear cuenta</button>
+    </div>
+    <form id="authForm">
+      <label for="authEmail">Correo electrónico</label>
+      <input type="email" id="authEmail" autocomplete="email" required>
+      <label for="authPass">Contraseña</label>
+      <input type="password" id="authPass" autocomplete="current-password" minlength="8" required>
+      <button class="submit" id="authSubmit" type="submit">Entrar</button>
+      <div class="auth-err" id="authErr"></div>
+      <div class="freebie" id="authFreebie"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ==================== PAYWALL ==================== -->
+<div class="modal-bg hidden" id="paywall">
+  <div class="modal">
+    <h2>Suscríbete a SuitPlay Pro</h2>
+    <div class="sub2">Análisis ilimitados mientras tu suscripción esté activa. Elige un plan:</div>
+    <div id="planList"></div>
+    <div class="pay-msg hidden" id="payMsg"></div>
+    <button class="ghost close" id="paywallClose">Cerrar</button>
+  </div>
+</div>
+
+<!-- ==================== APP ==================== -->
+<div id="app" class="hidden">
+<header>
+  <h1><span class="pips">♠♥♦♣</span> SuitPlay Pro</h1>
+  <span class="sub">resultados idénticos al SuitPlay clásico</span>
+  <div class="userbox">
+    <span id="userEmail"></span>
+    <span class="credits-chip" id="planChip" title="clic para gestionar tu plan"><b id="planTxt">–</b></span>
+    <button id="btnAdmin" class="hidden" onclick="location.href='/admin'">Panel admin</button>
+    <button id="btnLogout">Salir</button>
+  </div>
+</header>
+
+<main>
+  <div>
+    <div class="panel">
+      <h2>Combinación de palo</h2>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--north)"></span><b>Norte</b></span>
+        <span><span class="dot" style="background:var(--south)"></span><b>Sur</b></span>
+        <span><span class="dot" style="background:var(--ew)"></span><b>E-O (defensa)</b></span>
+        <span style="margin-left:auto">clic para asignar</span>
+      </div>
+      <div class="deck" id="deck"></div>
+      <div class="hands">
+        <span class="who">Norte</span><span class="cards-n" id="handN">—</span>
+        <span class="who">Sur</span><span class="cards-s" id="handS">—</span>
+        <span class="who">E-O</span><span class="cards-ew" id="handEW">—</span>
+      </div>
+      <div class="opts">
+        <div>
+          <label for="vacW">Vacant places Oeste</label>
+          <input type="number" id="vacW" value="13" min="1" max="26">
+        </div>
+        <div>
+          <label for="vacE">Vacant places Este</label>
+          <input type="number" id="vacE" value="13" min="1" max="26">
+        </div>
+        <button class="calc" id="btnCalc">Calcular</button>
+      </div>
+      <div id="warnBox"></div>
+      <div class="calcstate" id="calcState">
+        <div class="spinner"></div>
+        <span id="calcMsg">calculating…</span>
+        <button class="ghost" id="btnCancel">Cancelar</button>
+      </div>
+    </div>
+
+    <div class="panel" id="playPanel">
+      <h2>Play</h2>
+      <div class="play-head">
+        <label for="lineSel">Line:</label>
+        <select id="lineSel"><option value="">—</option></select>
+        <div class="play-stats" id="playStats"></div>
+      </div>
+      <div id="playArea"><div class="empty">pulsa Calcular: aquí podrás jugar la línea
+        truco a truco (tú llevas la defensa)</div></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <h2>Success probabilities</h2>
+      <div id="goalsBox"><div class="empty">Asigna las cartas y pulsa Calcular.</div></div>
+      <div class="lineinfo" id="lineInfo"></div>
+    </div>
+    <div class="panel">
+      <h2>West – East</h2>
+      <div id="weBox"><div class="empty">Sin resultados todavía.</div></div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  SuitPlay Pro — motor exacto validado contra el SuitPlay clásico de Jeroen Warmerdam.
+  Modelo: declarante single-dummy contra defensa óptima omnisciente.
+  Análisis ilimitados con suscripción activa.
+</footer>
+</div>
+
+<script>
+'use strict';
+// ==================== estado global ====================
+const RANKS = ['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+const SEAT_NAME = {N:'Norte', S:'Sur', W:'Oeste', E:'Este'};
+let me = null;              // usuario autenticado
+let pricing = null;
+let currentKey = null;
+const paidKeys = new Set(); // combos ya pagados en esta sesión
+
+function $(id) { return document.getElementById(id); }
+
+async function api(path, body) {
+  const r = await fetch(path, {
+    method: body !== undefined ? 'POST' : 'GET',
+    headers: body !== undefined ? {'Content-Type': 'application/json'} : {},
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  const data = await r.json().catch(() => ({}));
+  return {status: r.status, data};
+}
+
+// ==================== auth ====================
+let authMode = 'login';
+function setAuthMode(m) {
+  authMode = m;
+  $('tabLogin').className = m === 'login' ? 'on' : '';
+  $('tabRegister').className = m === 'register' ? 'on' : '';
+  $('authSubmit').textContent = m === 'login' ? 'Entrar' : 'Crear cuenta';
+  $('authPass').autocomplete = m === 'login' ? 'current-password' : 'new-password';
+  $('authErr').textContent = '';
+  $('authFreebie').textContent = m === 'register' && pricing
+    ? `Al registrarte tienes ${pricing.trialDays} días de prueba gratis con uso ilimitado` : '';
+}
+$('tabLogin').addEventListener('click', () => setAuthMode('login'));
+$('tabRegister').addEventListener('click', () => setAuthMode('register'));
+
+$('authForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('authSubmit').disabled = true;
+  $('authErr').textContent = '';
+  const body = {email: $('authEmail').value, password: $('authPass').value};
+  const {status, data} = await api('/api/' + (authMode === 'login' ? 'login' : 'register'), body);
+  $('authSubmit').disabled = false;
+  if (status === 200) { enterApp(data.user); }
+  else { $('authErr').textContent = data.error || 'Error ' + status; }
+});
+
+function enterApp(user) {
+  me = user;
+  $('authScreen').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  $('userEmail').textContent = me.email;
+  $('btnAdmin').classList.toggle('hidden', !me.isAdmin);
+  renderPlan();
+  confirmPendingPayment();
+  if (!me.active) showPaywall();
+}
+
+const PLAN_NAMES = {trial: 'prueba', mensual: 'mensual', anual: 'anual', cortesia: 'cortesía'};
+function renderPlan() {
+  if (!me) { $('planTxt').textContent = '–'; return; }
+  if (!me.active) {
+    $('planTxt').textContent = 'suscripción vencida — renovar';
+  } else if (me.plan === 'trial') {
+    $('planTxt').textContent = `prueba: ${me.daysLeft} día${me.daysLeft === 1 ? '' : 's'}`;
+  } else {
+    $('planTxt').textContent = `${PLAN_NAMES[me.plan] || me.plan} · activo`;
+  }
+}
+
+$('btnLogout').addEventListener('click', async () => {
+  await api('/api/logout', {});
+  location.reload();
+});
+
+// pago retornado de Stripe (?pago=SESSION_ID)
+async function confirmPendingPayment() {
+  const sid = new URLSearchParams(location.search).get('pago');
+  if (!sid) return;
+  history.replaceState(null, '', '/');
+  const {status, data} = await api('/api/confirm-payment', {session_id: sid});
+  if (status === 200) { me = data.user; renderPlan(); }
+}
+
+// ==================== paywall ====================
+async function showPaywall() {
+  if (!pricing) pricing = (await api('/api/pricing')).data;
+  const list = $('planList');
+  list.innerHTML = '';
+  for (const p of pricing.plans) {
+    const d = document.createElement('div');
+    d.className = 'plan';
+    d.innerHTML = `<div><div class="pname">${p.name}</div>
+      <div class="pcred">análisis ilimitados</div></div>
+      <div class="pprice">${p.label}</div>`;
+    d.addEventListener('click', async () => {
+      const {data} = await api('/api/checkout', {plan: p.id});
+      if (data.url) { location.href = data.url; }
+      else {
+        const m = $('payMsg');
+        m.textContent = data.message || data.error || 'No disponible.';
+        m.classList.remove('hidden');
+      }
+    });
+    list.appendChild(d);
+  }
+  $('paywall').classList.remove('hidden');
+}
+$('paywallClose').addEventListener('click', () => $('paywall').classList.add('hidden'));
+$('planChip').addEventListener('click', showPaywall);
+
+// ==================== baraja ====================
+const assign = {};
+RANKS.forEach(r => assign[r] = 0);
+['A','Q','9'].forEach(r => assign[r] = 1);
+['J','5','3'].forEach(r => assign[r] = 2);
+
+const deckEl = $('deck');
+RANKS.forEach(r => {
+  const d = document.createElement('div');
+  d.className = 'chip'; d.textContent = r; d.dataset.rank = r;
+  d.title = 'clic: E-O → Norte → Sur';
+  d.addEventListener('click', () => { assign[r] = (assign[r] + 1) % 3; refreshDeck(); });
+  deckEl.appendChild(d);
+});
+
+function handStr(owner) { return RANKS.filter(r => assign[r] === owner).join(''); }
+function refreshDeck() {
+  for (const d of deckEl.children) {
+    const a = assign[d.dataset.rank];
+    d.className = 'chip' + (a === 1 ? ' north' : a === 2 ? ' south' : '');
+  }
+  $('handN').textContent = handStr(1) || '—';
+  $('handS').textContent = handStr(2) || '—';
+  $('handEW').textContent = handStr(0) || '—';
+  const t = handStr(0).length;
+  $('warnBox').innerHTML =
+    t >= 8 ? '<div class="warn">⚠ ' + t + ' cartas en la defensa: el cálculo exacto puede tardar muchos minutos.</div>' :
+    t === 7 ? '<div class="warn">7 cartas en la defensa: el cálculo tarda ~15–60 s.</div>' : '';
+}
+refreshDeck();
+
+// ==================== worker ====================
+let worker = null;
+let msgId = 0;
+const pending = new Map();
+
+function ensureWorker() {
+  if (worker) return;
+  worker = new Worker('worker.js');
+  worker.onmessage = e => {
+    const {id, type} = e.data;
+    const h = pending.get(id);
+    if (!h) return;
+    if (type !== 'progress') pending.delete(id);
+    h(e.data);
+  };
+  worker.onerror = err => {
+    for (const [, h] of pending) h({type: 'error', message: err.message || 'worker error'});
+    pending.clear();
+  };
+}
+
+function send(msg, handler) {
+  ensureWorker();
+  msg.id = ++msgId;
+  pending.set(msg.id, handler);
+  worker.postMessage(msg);
+}
+
+function sendP(msg) {
+  return new Promise(resolve => send(msg, resolve));
+}
+
+// ==================== cálculo + créditos ====================
+function setCalculating(on, msg) {
+  $('calcState').className = 'calcstate' + (on ? ' on' : '');
+  $('btnCalc').disabled = on;
+  if (msg) $('calcMsg').textContent = msg;
+}
+
+async function startCalc() {
+  const north = handStr(1), south = handStr(2);
+  const vacW = +$('vacW').value || 13;
+  const vacE = +$('vacE').value || 13;
+  const key = north + '|' + south + '|' + vacW + '|' + vacE;
+
+  // suscripcion activa requerida (el analisis se registra como metrica)
+  const cachedResp = await sendP({cmd: 'isCached', key});
+  if (!cachedResp.cached && !paidKeys.has(key)) {
+    const {status, data} = await api('/api/log-use', {combo: north + '/' + south});
+    if (status === 402) { me.active = false; renderPlan(); showPaywall(); return; }
+    if (status === 401) { location.reload(); return; }
+    if (status !== 200) {
+      $('goalsBox').innerHTML = '<div class="err">Error: ' + (data.error || status) + '</div>';
+      return;
+    }
+    paidKeys.add(key);
+  }
+
+  setCalculating(true, 'calculating…');
+  const t0 = Date.now();
+  send({cmd: 'analyze', key, north, south, vacW, vacE}, resp => {
+    if (resp.type === 'progress') {
+      const s = ((Date.now() - t0) / 1000).toFixed(0);
+      $('calcMsg').textContent = 'calculating… ' + resp.nodes + ' nodos · ' + s + ' s';
+    } else if (resp.type === 'done') {
+      currentKey = key;
+      setCalculating(false);
+      render(resp.data);
+    } else if (resp.type === 'error') {
+      setCalculating(false);
+      $('goalsBox').innerHTML = '<div class="err">Error: ' + resp.message + '</div>';
+    }
+  });
+}
+
+$('btnCalc').addEventListener('click', startCalc);
+$('btnCancel').addEventListener('click', () => {
+  if (worker) { worker.terminate(); worker = null; pending.clear(); }
+  setCalculating(false);
+});
+
+// ==================== render resultados ====================
+function pct(x, dec) { return (x * 100).toFixed(dec) + '%'; }
+
+function render(d) {
+  let h = '<table class="goal-table"><tr><th class="l">Goal</th><th>Succ. prob.</th><th class="l">Line</th></tr>';
+  for (const g of d.goals) {
+    h += '<tr><td class="goal l">' + g.g + '</td><td class="mono">' + pct(g.prob, 4) +
+         '</td><td class="l">' +
+         g.labels.split('').map(l => '<span class="lines-badge">' + l + '</span>').join('') +
+         '</td></tr>';
+  }
+  h += '<tr><td class="l" style="color:var(--muted)">mp-best</td><td></td><td class="l">' +
+       d.mpLabel.split('').map(l => '<span class="lines-badge">' + l + '</span>').join('') +
+       '</td></tr></table>';
+  $('goalsBox').innerHTML = h;
+
+  let li = d.lines.map(l =>
+    '<b>' + l.label + '</b>: E[bazas] = ' + l.expected.toFixed(4) +
+    ' · ' + l.pGoals.map(pg => 'P(≥' + pg.g + ') = ' + pct(pg.p, 2)).join(' · ')
+  ).join('<br>');
+  li += '<br><span style="opacity:.75">Defensa: ' + d.ewStr + ' (' + d.t +
+        ' cartas) · ' + d.frontier + ' estrategias no dominadas · ' +
+        (d.cached ? 'caché' : d.secs.toFixed(1) + ' s') + '</span>';
+  $('lineInfo').innerHTML = li;
+
+  const labels = d.lines.map(l => l.label);
+  let w = '<table class="we-table"><tr><th class="l">West – East</th><th>#</th><th>prob.</th>';
+  for (const lb of labels) w += '<th>' + lb + '</th>';
+  w += '</tr>';
+  const maxGoal = d.goals.length ? d.goals[0].g : 0;
+  for (const r of d.rows) {
+    w += '<tr><td class="l">' + r.we + '</td><td>' + r.count + '</td><td>' + pct(r.prob, 2) + '</td>';
+    for (const lb of labels) {
+      const t = r.tricks[lb];
+      w += '<td class="' + (t >= maxGoal ? 'tr3' : 'dim') + '">' + t + '</td>';
+    }
+    w += '</tr>';
+  }
+  w += '</table>';
+  $('weBox').innerHTML = w;
+
+  const sel = $('lineSel');
+  sel.innerHTML = '<option value="">—</option>' +
+    labels.map(lb => '<option value="' + lb + '">' + lb + '</option>').join('');
+  $('playStats').innerHTML = '';
+  if (labels.length) {
+    sel.value = labels[0];
+    playCmd({cmd: 'playStart', key: currentKey, line: labels[0]});
+  }
+}
+
+// ==================== play ====================
+let playBusy = false;
+
+$('lineSel').addEventListener('change', e => {
+  const line = e.target.value;
+  if (!line) {
+    $('playArea').innerHTML = '<div class="empty">selecciona una línea de juego</div>';
+    return;
+  }
+  playCmd({cmd: 'playStart', key: currentKey, line});
+});
+
+function playCmd(msg) {
+  if (playBusy) return;
+  playBusy = true;
+  send(msg, resp => {
+    playBusy = false;
+    if (resp.type === 'playState') renderPlay(resp.state);
+    else if (resp.type === 'reanalyze') {
+      $('playArea').innerHTML = '<div class="err">Vuelve a pulsar Calcular primero.</div>';
+    } else if (resp.type === 'error') {
+      $('playArea').innerHTML = '<div class="err">Error: ' + resp.message + '</div>';
+    }
+  });
+}
+
+function seatCard(st, seat) {
+  if (!st.trick) return null;
+  const p = st.trick.plays.find(p => p.seat === seat);
+  return p ? p.str : null;
+}
+
+function renderPlay(st) {
+  $('playStats').innerHTML = 'Tricks won: <b>' + st.tricksWon + '</b> · Truco ' +
+    st.trickNum + ' · repartos: ' + st.compat.count;
+
+  let h = '';
+  const cells = {N: 'n', W: 'w', E: 'e', S: 's'};
+  h += '<div class="felt">';
+  for (const seat of ['N', 'W', 'E', 'S']) {
+    const c = seatCard(st, seat);
+    const isWaiting = st.waiting && st.waiting.seat === seat;
+    h += '<div class="seat ' + cells[seat] + '">' + SEAT_NAME[seat];
+    if (seat === 'N') h += '<div class="rem">' + st.northRem + '</div>';
+    if (seat === 'S') h += '<div class="rem">' + st.southRem + '</div>';
+    h += '<div class="pcard' + (c ? '' : ' empty') + '">' +
+         (c || (isWaiting ? '?' : '·')) + '</div></div>';
+    if (seat === 'W') {
+      h += '<div class="seat c">' + (st.trick ? 'truco ' + st.trickNum : '') + '</div>';
+    }
+  }
+  h += '</div>';
+
+  if (st.finished) {
+    h += '<div class="play-done">' + st.finalNote + '</div>';
+  } else if (st.waiting) {
+    const seat = SEAT_NAME[st.waiting.seat];
+    h += '<div class="play-msg">';
+    if (st.waiting.type === 'lead') {
+      h += '<span class="turn">' + seat + ' ganó el truco</span> — elige su jugada (defensa):';
+    } else {
+      h += 'Tu turno: <span class="turn">juega la carta de ' + seat + '</span> (defensa):';
+    }
+    h += '</div><div class="opt-cards">';
+    st.waiting.options.forEach((o, i) => {
+      const lbl = o.kind === 'card' ? o.str : o.kind === 'showout' ? 'fallo' : 'salirse';
+      h += '<button class="opt-card" data-opt="' + i + '">' + lbl +
+           '<small>' + o.count + ' rep · ' + pct(o.prob, 1) + '</small></button>';
+    });
+    h += '</div>';
+  }
+
+  h += '<div class="play-ctl">' +
+       '<button class="ghost" id="pRestart">⏮ Reiniciar</button>' +
+       '<button class="ghost" id="pBack"' + (st.canBack ? '' : ' disabled') + '>↶ Atrás</button>' +
+       (st.finished ? '' : '<button class="ghost" id="pAuto">▶ Jugar una carta</button>') +
+       '</div>';
+
+  if (st.log.length) {
+    h += '<div class="play-log">' + st.log.map(e =>
+      'Truco ' + e.num + ': ' + e.plays.map(p => p.seat + ':' + p.str).join(' ') +
+      ' → <span class="' + (e.ns ? 'win-ns' : 'win-ew') + '">' + (e.ns ? 'NS' : 'EO') + '</span>'
+    ).join('<br>') + '</div>';
+  }
+
+  const area = $('playArea');
+  area.innerHTML = h;
+
+  if (st.waiting) {
+    area.querySelectorAll('.opt-card').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const o = st.waiting.options[+btn.dataset.opt];
+        playCmd({cmd: 'playChoose', key: currentKey, option: {kind: o.kind, rank: o.rank}});
+      });
+    });
+  }
+  const r = $('pRestart');
+  if (r) r.addEventListener('click', () => playCmd({cmd: 'playRestart', key: currentKey}));
+  const b = $('pBack');
+  if (b && st.canBack) b.addEventListener('click', () => playCmd({cmd: 'playBack', key: currentKey}));
+  const au = $('pAuto');
+  if (au) au.addEventListener('click', () => playCmd({cmd: 'playAuto', key: currentKey}));
+}
+
+// ==================== arranque ====================
+(async () => {
+  pricing = (await api('/api/pricing')).data;
+  setAuthMode('login');
+  const {status, data} = await api('/api/me');
+  if (status === 200) enterApp(data.user);
+})();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

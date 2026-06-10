@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0b6e4f">
+<title>SuitPlay Pro — Panel de administración</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --ink: #1a2433; --muted: #66748a;
+    --accent: #0b6e4f; --accent-soft: #e3f2ec;
+    --line: #dde3ea; --ew-soft: #eceff3;
+    --mono: "Cascadia Code", "Consolas", "SF Mono", monospace;
+    --sans: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font-family: var(--sans); font-size: 15px; line-height: 1.45; }
+  header { background: linear-gradient(135deg, #0b3d2e 0%, #0b6e4f 70%, #11875f 100%);
+           color: #fff; padding: 14px 24px; display: flex; align-items: center;
+           gap: 14px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 21px; font-weight: 650; }
+  header h1 .pips { font-size: 18px; letter-spacing: 2px; }
+  header .sub { opacity: .8; font-size: 12.5px; }
+  header button { margin-left: auto; background: transparent;
+                  border: 1px solid rgba(255,255,255,.4); color: #fff;
+                  padding: 5px 12px; border-radius: 8px; font-size: 12.5px; cursor: pointer; }
+  main { max-width: 1180px; margin: 22px auto; padding: 0 20px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+           padding: 18px 20px; box-shadow: 0 1px 3px rgba(20,35,60,.06); margin-bottom: 20px; }
+  .panel h2 { margin: 0 0 12px; font-size: 13px; font-weight: 700;
+              text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+           gap: 14px; margin-bottom: 20px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+          padding: 16px 18px; box-shadow: 0 1px 3px rgba(20,35,60,.06); }
+  .stat .v { font: 700 26px var(--mono); color: var(--accent); }
+  .stat .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 7px 10px; text-align: left; }
+  th { color: var(--muted); font-size: 11.5px; text-transform: uppercase;
+       letter-spacing: .6px; border-bottom: 2px solid var(--line); }
+  td { border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.mono { font-family: var(--mono); font-size: 13px; }
+  .pill { display: inline-block; padding: 1px 10px; border-radius: 12px;
+          font-size: 12px; font-weight: 650; }
+  .pill.activo { background: var(--accent-soft); color: var(--accent); }
+  .pill.trial { background: #e3edfb; color: #1d5fbf; }
+  .pill.vencido { background: #fde8e6; color: #b3261e; }
+  .pill.admin { background: #fff3d6; color: #9a6700; }
+  button.mini { background: #fff; border: 1px solid var(--line); color: var(--muted);
+                font: 600 12px var(--sans); padding: 4px 10px; border-radius: 7px; cursor: pointer; }
+  button.mini:hover { border-color: var(--accent); color: var(--accent); }
+  .empty { color: var(--muted); font-size: 14px; padding: 20px 0; text-align: center; }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .toolbar input { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px;
+                   font-size: 14px; width: 220px; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="pips">♠♥♦♣</span> SuitPlay Pro — Panel de administración</h1>
+  <span class="sub" id="meEmail"></span>
+  <button onclick="location.href='/'">← Volver a la app</button>
+</header>
+
+<main>
+  <div class="stats" id="stats"></div>
+
+  <div class="panel">
+    <h2>Usuarios</h2>
+    <div class="toolbar">
+      <input type="search" id="userFilter" placeholder="filtrar por correo…">
+      <span style="color:var(--muted);font-size:12.5px">
+        clic en «+30 días» para extender una suscripción (cortesía/soporte)</span>
+    </div>
+    <div id="usersBox"><div class="empty">cargando…</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>Pagos</h2>
+    <div id="paymentsBox"><div class="empty">cargando…</div></div>
+  </div>
+</main>
+
+<script>
+'use strict';
+function $(id) { return document.getElementById(id); }
+let data = null;
+
+function fmtDate(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString('es', {day:'2-digit', month:'short', year:'numeric'});
+}
+function fmtDateTime(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleString('es', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'});
+}
+
+const PLAN_NAMES = {trial: 'Prueba', mensual: 'Mensual', anual: 'Anual', cortesia: 'Cortesía'};
+
+async function load() {
+  const r = await fetch('/api/admin/overview');
+  if (r.status === 403 || r.status === 401) { location.href = '/'; return; }
+  data = await r.json();
+
+  const s = data.stats;
+  $('stats').innerHTML = [
+    [s.totalUsers, 'usuarios'],
+    [s.activeSubs, 'suscripciones activas'],
+    [s.onTrial, 'en prueba'],
+    [s.expired, 'vencidos'],
+    ['$' + s.revenueUsd.toFixed(2), 'ingresos (' + s.paymentsCount + ' pagos)'],
+    [s.analyses30d + ' / ' + s.analysesTotal, 'análisis 30d / total'],
+  ].map(([v, k]) => `<div class="stat"><div class="v">${v}</div><div class="k">${k}</div></div>`).join('');
+
+  renderUsers();
+  renderPayments();
+}
+
+function pillFor(u) {
+  if (u.active && u.plan === 'trial') return '<span class="pill trial">prueba</span>';
+  if (u.active) return '<span class="pill activo">activo</span>';
+  return '<span class="pill vencido">vencido</span>';
+}
+
+function renderUsers() {
+  const filter = ($('userFilter').value || '').toLowerCase();
+  const users = data.users.filter(u => u.email.includes(filter));
+  if (!users.length) { $('usersBox').innerHTML = '<div class="empty">sin usuarios</div>'; return; }
+  let h = `<table><tr><th>Correo</th><th>Plan</th><th>Estado</th><th>Vence</th>
+    <th class="num">Análisis</th><th>Último uso</th><th>Registro</th><th></th></tr>`;
+  for (const u of users) {
+    h += `<tr>
+      <td class="mono">${u.email}${u.isAdmin ? ' <span class="pill admin">admin</span>' : ''}</td>
+      <td>${PLAN_NAMES[u.plan] || u.plan}</td>
+      <td>${pillFor(u)}</td>
+      <td>${fmtDate(u.subUntil)}</td>
+      <td class="num">${u.analyses}</td>
+      <td>${fmtDateTime(u.lastUse)}</td>
+      <td>${fmtDate(u.created)}</td>
+      <td><button class="mini" data-email="${u.email}">+30 días</button></td>
+    </tr>`;
+  }
+  h += '</table>';
+  $('usersBox').innerHTML = h;
+  $('usersBox').querySelectorAll('button.mini').forEach(b => {
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      await fetch('/api/admin/extend', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email: b.dataset.email, days: 30}),
+      });
+      load();
+    });
+  });
+}
+
+function renderPayments() {
+  if (!data.payments.length) {
+    $('paymentsBox').innerHTML = '<div class="empty">todavía no hay pagos registrados</div>';
+    return;
+  }
+  let h = `<table><tr><th>Fecha</th><th>Correo</th><th>Plan</th>
+    <th class="num">Importe</th><th>Stripe session</th></tr>`;
+  for (const p of data.payments) {
+    h += `<tr>
+      <td>${fmtDateTime(p.ts)}</td>
+      <td class="mono">${p.email}</td>
+      <td>${PLAN_NAMES[p.plan] || p.plan}</td>
+      <td class="num">$${p.amountUsd.toFixed(2)}</td>
+      <td class="mono" style="font-size:11px">${p.sessionId.slice(0, 28)}…</td>
+    </tr>`;
+  }
+  h += '</table>';
+  $('paymentsBox').innerHTML = h;
+}
+
+$('userFilter').addEventListener('input', renderUsers);
+
+(async () => {
+  const me = await fetch('/api/me').then(r => r.json()).catch(() => ({}));
+  if (me.user) $('meEmail').textContent = me.user.email;
+  load();
+})();
+</script>
+</body>
+</html>

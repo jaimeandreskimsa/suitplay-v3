@@ -1,0 +1,5 @@
+# Datos de usuarios: credenciales y pagos — NUNCA subir
+data/
+*.db
+*.db-wal
+*.db-shm
