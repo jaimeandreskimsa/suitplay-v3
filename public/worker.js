@@ -60,6 +60,10 @@ self.onmessage = function (e) {
       self.postMessage({id: m.id, type: 'playState', state: session.restart()});
     }
   } catch (err) {
-    self.postMessage({id: m.id, type: 'error', message: String(err && err.stack || err)});
+    const msg = (err && err.code === 'TIMEOUT')
+      ? 'Esta combinación (honores muy repartidos en la defensa) supera el tiempo ' +
+        'límite del cálculo exacto. Prueba otra combinación.'
+      : String(err && err.stack || err);
+    self.postMessage({id: m.id, type: 'error', message: msg});
   }
 };

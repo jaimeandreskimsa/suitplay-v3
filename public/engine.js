@@ -71,6 +71,17 @@ const SEAT_ORDER = {
 // ---------------------------------------------------------------- vectores
 const INF = 15;
 
+// Presupuesto de tiempo: evita que una combinación pesada congele la pestaña
+// o consuma toda la memoria. Se arma en analyze() y se comprueba en los puntos
+// calientes (prune/combine). Al agotarse, lanza un error que el worker reenvía.
+let DEADLINE = 0;
+function setDeadline(ms) { DEADLINE = ms ? Date.now() + ms : 0; }
+function checkDeadline() {
+  if (DEADLINE && Date.now() > DEADLINE) {
+    const e = new Error('TIMEOUT'); e.code = 'TIMEOUT'; throw e;
+  }
+}
+
 function vecKey(v) {
   return String.fromCharCode.apply(null, v);
 }
@@ -89,16 +100,24 @@ function vecGe(u, t) {
   return true;
 }
 
-/** Pareto-máximos de una colección de Uint8Array (puede contener duplicados). */
-function prune(vecs) {
+/** Pareto-máximos de una colección de Uint8Array. Si `preUniq` es true, el
+ *  llamante garantiza que no hay duplicados (se ahorra una pasada de claves). */
+function prune(vecs, preUniq) {
   if (vecs.length <= 1) return vecs.slice();
-  const seen = new Set();
-  const uniq = [];
-  for (const v of vecs) {
-    const k = vecKey(v);
-    if (!seen.has(k)) { seen.add(k); uniq.push(v); }
+  let uniq;
+  if (preUniq) {
+    uniq = vecs;
+  } else {
+    const seen = new Set();
+    uniq = [];
+    for (const v of vecs) {
+      const k = vecKey(v);
+      if (!seen.has(k)) { seen.add(k); uniq.push(v); }
+    }
   }
   if (uniq.length === 1) return uniq;
+  // ordena por suma desc; los vectores se procesan de "mayor" a "menor", de
+  // modo que un vector solo puede ser dominado por otro ya conservado.
   const withSum = uniq.map(v => [vecSum(v), v]);
   withSum.sort((a, b) => {
     if (b[0] !== a[0]) return b[0] - a[0];
@@ -109,12 +128,18 @@ function prune(vecs) {
     return 0;
   });
   const kept = [];
+  const keptSums = [];
+  let guard = 0;
   outer:
-  for (const [, v] of withSum) {
-    for (const u of kept) {
-      if (vecGe(u, v)) continue outer;
+  for (const [sv, v] of withSum) {
+    if ((++guard & 2047) === 0) checkDeadline();
+    for (let k = 0; k < kept.length; k++) {
+      // un vector de igual suma no puede dominar (sería idéntico, ya único)
+      if (keptSums[k] === sv) continue;
+      if (vecGe(kept[k], v)) continue outer;
     }
     kept.push(v);
+    keptSums.push(sv);
   }
   return kept;
 }
@@ -140,6 +165,7 @@ function combine(branches, nd) {
     const seen = new Set();
     const next = [];
     for (const p of partials) {
+      checkDeadline();
       for (const v of evecs) {
         const m = new Uint8Array(nd);
         for (let i = 0; i < nd; i++) m[i] = p[i] < v[i] ? p[i] : v[i];
@@ -147,7 +173,7 @@ function combine(branches, nd) {
         if (!seen.has(k)) { seen.add(k); next.push(m); }
       }
     }
-    partials = prune(next);
+    partials = prune(next, true);   // next ya es único (dedup por `seen`)
   }
   return partials;
 }
@@ -225,12 +251,79 @@ class Solver {
            '|' + pl + '|' + parts.join(',');
   }
 
+  /** Carreras de cartas EW consecutivas (sin carta NS entre medias) dado el
+   *  conjunto de cartas presentes `ctx`. Cada carrera se devuelve de mayor a
+   *  menor. Las cartas dentro de una carrera son intercambiables. */
+  _runs(ctx, ew) {
+    const runs = [];
+    let cur = null;
+    for (const r of bitsOf(ctx).sort((a, b) => b - a)) {
+      const rb = bit(r);
+      if (ew & rb) {
+        if (!cur) { cur = []; runs.push(cur); }
+        cur.push(rb);
+      } else {
+        cur = null;            // una carta NS rompe la carrera
+      }
+    }
+    return runs;
+  }
+
+  /** Agrupa las distribuciones estructuralmente equivalentes: dos máscaras
+   *  son equivalentes si tienen el mismo número de cartas de West en cada
+   *  carrera (las cartas de una carrera son intercambiables, así que bajo
+   *  cualquier estrategia fija dan las mismas bazas). Devuelve representantes
+   *  canónicos y el mapeo dist->clase. */
+  _classify(ctx, ew, dists) {
+    const runs = this._runs(ctx, ew);
+    const byKey = new Map();
+    const reps = [];
+    const map = new Array(dists.length);
+    for (let i = 0; i < dists.length; i++) {
+      const d = dists[i];
+      let key = '';
+      for (const run of runs) {
+        let cnt = 0;
+        for (const rb of run) if (d & rb) cnt++;
+        key += cnt + ',';
+      }
+      let ci = byKey.get(key);
+      if (ci === undefined) {
+        ci = reps.length;
+        byKey.set(key, ci);
+        let repMask = 0;
+        for (const run of runs) {
+          let cnt = 0;
+          for (const rb of run) if (d & rb) cnt++;
+          for (let k = 0; k < cnt; k++) repMask |= run[k];  // top cnt a West
+        }
+        reps.push(repMask);
+      }
+      map[i] = ci;
+    }
+    return { reps, map };
+  }
+
   solve(n, s, ew, dists, lead) {
     const nd = dists.length;
     if (n === 0 && s === 0) return [new Uint8Array(nd)];
     if (ew === 0) {
       const v = new Uint8Array(nd).fill(Math.max(pc(n), pc(s)));
       return [v];
+    }
+    // Colapsa distribuciones equivalentes: resuelve sobre representantes y
+    // expande el resultado. Reduce drásticamente la dimensión de los vectores
+    // (y por tanto el tamaño de las fronteras de Pareto) sin cambiar el
+    // resultado: las columnas equivalentes siempre comparten valor. A medida
+    // que se retiran honores, más distribuciones colapsan (igual que el EXE).
+    const cls = this._classify(n | s | ew, ew, dists);
+    if (cls.reps.length < nd) {
+      const reduced = this.solve(n, s, ew, cls.reps, lead);
+      return reduced.map(rv => {
+        const full = new Uint8Array(nd);
+        for (let i = 0; i < nd; i++) full[i] = rv[cls.map[i]];
+        return full;
+      });
     }
     const key = this._canonKey(n, s, ew, dists, lead);
     let hit = this.memo.get(key);
@@ -308,6 +401,21 @@ class Solver {
   }
 
   _play(n, s, ew, dists, leader, leadCard) {
+    // Si lidera el declarante (carta NS, ajena a la reducción de EW), colapsa
+    // las distribuciones equivalentes: la reconstrucción del primer truco
+    // sobre todas las distribuciones se dispararía igual que el solver sin
+    // optimizar. Las columnas equivalentes comparten valor, así que es exacto.
+    if (dists.length > 1 && (bit(leadCard) & ew) === 0) {
+      const cls = this._classify(n | s | ew, ew, dists);
+      if (cls.reps.length < dists.length) {
+        const reduced = this._play(n, s, ew, cls.reps, leader, leadCard);
+        return reduced.map(rv => {
+          const full = new Uint8Array(dists.length);
+          for (let i = 0; i < dists.length; i++) full[i] = rv[cls.map[i]];
+          return full;
+        });
+      }
+    }
     return this._step(n, s, ew, leader, [[leader, leadCard]],
                       Array.from(dists));
   }
@@ -920,10 +1028,16 @@ function fmtWE(hmask, nsmall) {
 }
 
 function analyze(north, south, vacW = 13, vacE = 13, opts = {}) {
-  const a = new Analysis(north, south, vacW, vacE, opts);
-  a.selectLines();
-  a.buildTable();
-  return a;
+  const limit = opts.timeLimitMs !== undefined ? opts.timeLimitMs : 60000;
+  setDeadline(limit);
+  try {
+    const a = new Analysis(north, south, vacW, vacE, opts);
+    a.selectLines();
+    a.buildTable();
+    return a;
+  } finally {
+    setDeadline(0);
+  }
 }
 
 // exports (Node + browser)

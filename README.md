@@ -1,10 +1,36 @@
-# SuitPlay Pro — producto (SaaS)
+# SuitPlay Pro — producto
 
-PWA de suscripción para análisis de combinaciones de palo, con login,
-registro, prueba gratis y panel de super administración. Motor exacto
-validado contra el SuitPlay clásico (9 combinaciones, resultados idénticos).
+PWA para análisis de combinaciones de palo. Motor exacto validado contra el
+SuitPlay clásico (`SuitPlay.exe`) — probabilidades idénticas, decimal a decimal,
+en todas las combinaciones comparadas.
 
-## Modelo de negocio (SaaS, no por consumo)
+## Modo de acceso
+
+Por defecto la app es de **acceso libre** (sin login), para subirla y probarla
+sin registrarse. Para activar el modo **SaaS** completo (registro, login, prueba
+gratis, suscripción y paywall) arranca con:
+
+```
+set AUTH_DISABLED=0
+```
+
+Con el modo SaaS desactivado (por defecto) toda la API responde como un usuario
+local con acceso ilimitado y el panel `/admin` queda accesible.
+
+## Motor de cálculo
+
+- **Modelo**: declarante single-dummy contra defensa óptima omnisciente
+  (best defense), idéntico al SuitPlay clásico.
+- **Optimización**: el solver colapsa dinámicamente las distribuciones
+  estructuralmente equivalentes (cartas intercambiables), igual que el EXE.
+  La mayoría de combinaciones se resuelven en menos de 1 s.
+- **Límite**: las combinaciones con honores de la defensa muy repartidos
+  (cada carta aislada entre cartas N/S) tienen una frontera de estrategias
+  intrínsecamente enorme y pueden superar el tiempo límite del cálculo
+  (60 s); en ese caso la UI muestra un aviso y se puede cancelar. Igualar al
+  EXE en esos casos requiere su algoritmo de representación compacta.
+
+## Modelo de negocio (SaaS, no por consumo) — `AUTH_DISABLED=0`
 
 - Al registrarse: **7 días de prueba gratis** con uso ilimitado
   (`TRIAL_DAYS` en server.js).
@@ -15,7 +41,8 @@ validado contra el SuitPlay clásico (9 combinaciones, resultados idénticos).
 
 ## Panel de super admin (`/admin`)
 
-Protegido en el servidor (redirige a `/` si no eres admin). Incluye:
+En modo abierto (por defecto) es accesible directamente. En modo SaaS está
+protegido en el servidor (redirige a `/` si no eres admin). Incluye:
 - **Métricas**: usuarios totales, suscripciones activas, en prueba,
   vencidos, ingresos acumulados y nº de pagos, análisis últimos 30 días/total.
 - **Usuarios**: correo, plan, estado, fecha de vencimiento, análisis

@@ -128,7 +128,17 @@ function clearSessionCookie(res) {
     'sp_session=; Path=/; HttpOnly; SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT');
 }
 
+// Modo abierto (sin login): por defecto la app es de acceso libre para poder
+// probarla sin registrarse. Toda petición actúa como este usuario (admin, sin
+// caducidad). Para activar el modo SaaS con cuentas: set AUTH_DISABLED=0
+const AUTH_DISABLED = process.env.AUTH_DISABLED !== '0';
+const LOCAL_USER = {
+  id: 0, email: 'local@localhost', plan: 'local',
+  sub_until: Number.MAX_SAFE_INTEGER, stripe_sub: null, is_admin: 1, created: 0,
+};
+
 function getUser(req) {
+  if (AUTH_DISABLED) return LOCAL_USER;
   const token = getCookie(req, 'sp_session');
   if (!token) return null;
   const s = db.prepare('SELECT * FROM sessions WHERE token = ?').get(token);
@@ -276,6 +286,7 @@ const routes = {
       plans: PLANS.map(p => ({ id: p.id, name: p.name, usd: p.usd, label: p.label })),
       paymentsEnabled: !!STRIPE_KEY,
       trialDays: TRIAL_DAYS,
+      authDisabled: AUTH_DISABLED,
     });
   },
 
@@ -408,9 +419,14 @@ function serveFile(res, file) {
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); return res.end('no encontrado'); }
     const ext = path.extname(file).toLowerCase();
+    // El código (HTML/JS) se revalida siempre para que una actualización del
+    // motor llegue de inmediato (el worker carga engine.js con importScripts y
+    // una copia cacheada serviría una versión vieja). Los recursos estáticos
+    // (iconos, manifest) sí se cachean.
+    const revalidate = ext === '.html' || ext === '.js';
     res.writeHead(200, {
       'Content-Type': MIME[ext] || 'application/octet-stream',
-      'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=3600',
+      'Cache-Control': revalidate ? 'no-cache' : 'public, max-age=3600',
     });
     res.end(data);
   });

@@ -182,7 +182,7 @@
 <body>
 
 <!-- ==================== AUTH ==================== -->
-<div class="auth-screen" id="authScreen">
+<div class="auth-screen hidden" id="authScreen">
   <div class="auth-card">
     <h1><span style="letter-spacing:2px">♠♥♦♣</span> SuitPlay Pro</h1>
     <div class="tag">Análisis exacto de combinaciones de palo</div>
@@ -430,9 +430,10 @@ function refreshDeck() {
   $('handS').textContent = handStr(2) || '—';
   $('handEW').textContent = handStr(0) || '—';
   const t = handStr(0).length;
-  $('warnBox').innerHTML =
-    t >= 8 ? '<div class="warn">⚠ ' + t + ' cartas en la defensa: el cálculo exacto puede tardar muchos minutos.</div>' :
-    t === 7 ? '<div class="warn">7 cartas en la defensa: el cálculo tarda ~15–60 s.</div>' : '';
+  $('warnBox').innerHTML = t >= 6
+    ? '<div class="warn">Con ' + t + ' cartas en la defensa y honores muy repartidos el ' +
+      'cálculo exacto puede tardar. Verás el progreso y puedes pulsar Cancelar.</div>'
+    : '';
 }
 refreshDeck();
 
@@ -678,6 +679,7 @@ function renderPlay(st) {
   setAuthMode('login');
   const {status, data} = await api('/api/me');
   if (status === 200) enterApp(data.user);
+  else if (!pricing.authDisabled) $('authScreen').classList.remove('hidden');
 })();
 
 if ('serviceWorker' in navigator) {
