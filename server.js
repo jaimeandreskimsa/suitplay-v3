@@ -34,7 +34,7 @@ const PORT = +(process.env.PORT || 8080);
 const TRIAL_DAYS = 7;
 const SESSION_DAYS = 30;
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const STRIPE_KEY = process.env.STRIPE_SECRET_KEY || '';
 const DAY = 86400000;
 

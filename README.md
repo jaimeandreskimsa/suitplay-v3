@@ -73,6 +73,20 @@ iniciar.bat                      (o: node --experimental-sqlite server.js)
 http://localhost:8080. Producción: VPS + proxy HTTPS delante (Caddy, 2
 líneas) — HTTPS es obligatorio para PWA instalable fuera de localhost.
 
+## Desplegar en Railway
+
+1. Sube esta carpeta (`producto/`) como repo a GitHub y crea en Railway un
+   proyecto "Deploy from GitHub repo". Detecta Node por `package.json` y
+   arranca con `npm start` (requiere Node 22.5+, ver `engines`).
+2. **Volumen para la BD** (el filesystem es efímero): añade un Volume al
+   servicio montado en `/data` y define la variable `DATA_DIR=/data`.
+   Sin esto, usuarios/pagos se pierden en cada deploy (en modo abierto solo
+   se perderían métricas).
+3. Variables opcionales: `AUTH_DISABLED=0` (modo SaaS con cuentas),
+   `STRIPE_SECRET_KEY=sk_live_...` (pagos).
+4. Railway publica con HTTPS en `*.up.railway.app` → la PWA es instalable
+   directamente. `PORT` lo inyecta Railway y el servidor ya lo lee.
+
 ## Pagos (Stripe, modo suscripción)
 
 1. Cuenta en stripe.com → clave secreta.

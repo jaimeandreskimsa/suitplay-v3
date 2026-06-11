@@ -1,0 +1,12 @@
+{
+  "name": "suitplay-pro",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Analizador de combinaciones de palo — motor exacto validado contra SuitPlay",
+  "scripts": {
+    "start": "node --experimental-sqlite server.js"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}
