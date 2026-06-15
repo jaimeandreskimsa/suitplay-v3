@@ -63,6 +63,9 @@ node --experimental-sqlite server.js admin tucorreo@dominio.com
   análisis — escala a miles de usuarios con una máquina mínima.
 - **PWA**: instalable, service worker, shell offline.
 - **BD**: SQLite en `data/suitplay.db` — copiar el archivo = backup.
+- **Favoritos**: cada usuario guarda combinaciones en su cuenta (tabla
+  `favorites`, endpoints `GET/POST /api/favorites` y `POST /api/favorites/delete`);
+  sincronizan entre dispositivos y se cachean en el cliente para verlas offline.
 
 ## Arrancar
 

@@ -630,19 +630,25 @@ class Analysis {
     return this.lines;
   }
 
-  /** Cartas EW 'x': equivalentes a la más baja para todas las líneas. */
+  /** Cartas EW 'x': pequeñas (<T) equivalentes a la más baja para todas las
+   *  líneas. Los honores (A K Q J T) nunca se pliegan: siempre se muestran con
+   *  su rango en la tabla West-East, aunque su posición no cambie las bazas
+   *  (p. ej. un As de la defensa que siempre gana una baza esté donde esté). */
   honorClasses() {
     const vecs = this.lines.map(([, v]) => v);
     const ewb = bitsOf(this.ew).sort((a, b) => a - b);
     if (!ewb.length) return [0, 0];
-    const lowest = ewb[0];
+    const HONOR = 10;                       // T o superior: siempre visible
+    const spots = ewb.filter(r => r < HONOR);
+    if (!spots.length) return [this.ew, 0]; // solo honores: mostrar todo
+    const lowest = spots[0];
     const out = new Map();
     this.dists.forEach((w, i) => {
       out.set(w, vecs.map(v => v[i]).join(','));
     });
     let xmask = bit(lowest);
     const lb = bit(lowest);
-    for (const c of ewb.slice(1)) {
+    for (const c of spots.slice(1)) {
       const cb = bit(c);
       let ok = true;
       for (const w of this.dists) {
@@ -883,7 +889,11 @@ class PlaySession {
     const ctx = st.n | st.s | st.ew;
     for (const [seat, hand] of [['N', st.n], ['S', st.s]]) {
       if (!hand) continue;
-      for (const c of reduceEquiv(hand, ctx)) {
+      // Preferencia humana: cuando hay que perder una baza igual, cobra los
+      // honores antes que pinchar chico. Probamos las cartas de mayor a menor;
+      // como solo se acepta una jugada que alcance el vector objetivo, en
+      // posiciones de finesse seguirá jugando chico (cobrar sería subóptimo).
+      for (const c of reduceEquiv(hand, ctx).sort((x, y) => y - x)) {
         const set = this.solver._play(st.n, st.s, st.ew, st.dists, seat, c);
         for (const u of set) {
           if (vecGe(u, st.target)) {
@@ -910,7 +920,8 @@ class PlaySession {
       return;
     }
     const ctx = st.n | st.s | st.ew;
-    for (const c of reduceEquiv(hand, ctx)) {
+    // misma preferencia que en el liderazgo: cartas de mayor a menor.
+    for (const c of reduceEquiv(hand, ctx).sort((x, y) => y - x)) {
       const npl = plays.concat([[seat, c]]);
       const set = this.solver._step(st.n, st.s, st.ew, st.trick.leaderSeat,
                                     npl, st.dists);
@@ -1027,6 +1038,19 @@ function fmtWE(hmask, nsmall) {
   return h + 'x'.repeat(nsmall);
 }
 
+/** Juega una línea de principio a fin con la defensa "natural" (carta más
+ *  baja) y devuelve la secuencia completa de bazas, para narrar cómo se juega
+ *  la línea sin obligar al usuario a jugarla carta por carta. */
+function autoLine(analysis, label) {
+  const ps = new PlaySession(analysis);
+  ps.start(label);
+  let guard = 0;
+  while (!ps.st.finished && guard++ < 200) ps.autoPlay();
+  const st = ps.getState();
+  return { line: label, tricks: st.log, tricksWon: st.tricksWon,
+           finalNote: st.finalNote };
+}
+
 function analyze(north, south, vacW = 13, vacE = 13, opts = {}) {
   const limit = opts.timeLimitMs !== undefined ? opts.timeLimitMs : 60000;
   setDeadline(limit);
@@ -1042,7 +1066,7 @@ function analyze(north, south, vacW = 13, vacE = 13, opts = {}) {
 
 // exports (Node + browser)
 const SuitPlayEngine = {
-  Analysis, PlaySession, analyze, parseCards, fmtMask, fmtWE,
+  Analysis, PlaySession, analyze, autoLine, parseCards, fmtMask, fmtWE,
   bitsOf, pc, bit, RANK_STR, STR_RANK, comb,
 };
 if (typeof module !== 'undefined' && module.exports) {

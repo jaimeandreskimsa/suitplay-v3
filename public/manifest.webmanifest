@@ -1,7 +1,7 @@
 {
   "name": "SuitPlay Pro — Analizador de combinaciones de palo",
   "short_name": "SuitPlay Pro",
-  "description": "Análisis exacto de combinaciones de palo de bridge: probabilidades por objetivo, líneas óptimas y juego interactivo truco a truco.",
+  "description": "Análisis exacto de combinaciones de palo de bridge: probabilidades por objetivo, líneas óptimas y juego interactivo baza a baza.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

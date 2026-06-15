@@ -78,6 +78,15 @@ db.exec(`
     amount_usd REAL NOT NULL,
     ts INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS favorites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    north TEXT NOT NULL,
+    south TEXT NOT NULL,
+    vac_w INTEGER NOT NULL,
+    vac_e INTEGER NOT NULL,
+    created INTEGER NOT NULL
+  );
 `);
 
 // ---------------------------------------------------------------- helpers
@@ -159,6 +168,18 @@ function rateLimited(ip) {
 }
 
 function isActive(u) { return u.sub_until > now(); }
+
+// favoritos: saneado de manos (solo rangos válidos) y lista por usuario
+function cleanHand(v) {
+  return String(v || '').toUpperCase().replace(/[^AKQJT2-9]/g, '').slice(0, 13);
+}
+function clampVac(v) { return Math.max(1, Math.min(26, +v || 13)); }
+function listFavorites(userId) {
+  return db.prepare(
+    `SELECT id, north, south, vac_w, vac_e FROM favorites
+     WHERE user_id = ? ORDER BY created DESC, id DESC`).all(userId)
+    .map(r => ({ id: r.id, n: r.north, s: r.south, vacW: r.vac_w, vacE: r.vac_e }));
+}
 
 function publicUser(u) {
   return {
@@ -349,6 +370,36 @@ const routes = {
       .run(plan.id, until, subId, u.id);
     const me = db.prepare('SELECT * FROM users WHERE id = ?').get(u.id);
     json(res, 200, { user: publicUser(me) });
+  },
+
+  // ------------------------------------------------ favoritos
+  'GET /api/favorites': async (req, res) => {
+    const u = getUser(req);
+    if (!u) return json(res, 401, { error: 'no autenticado' });
+    json(res, 200, { favorites: listFavorites(u.id) });
+  },
+
+  'POST /api/favorites': async (req, res, body) => {
+    const u = getUser(req);
+    if (!u) return json(res, 401, { error: 'no autenticado' });
+    const n = cleanHand(body.n), s = cleanHand(body.s);
+    if (!n && !s) return json(res, 400, { error: 'combinación vacía' });
+    const vacW = clampVac(body.vacW), vacE = clampVac(body.vacE);
+    const dup = db.prepare(
+      `SELECT id FROM favorites WHERE user_id=? AND north=? AND south=? AND vac_w=? AND vac_e=?`)
+      .get(u.id, n, s, vacW, vacE);
+    if (!dup) {
+      db.prepare(`INSERT INTO favorites (user_id, north, south, vac_w, vac_e, created)
+                  VALUES (?,?,?,?,?,?)`).run(u.id, n, s, vacW, vacE, now());
+    }
+    json(res, 200, { favorites: listFavorites(u.id) });
+  },
+
+  'POST /api/favorites/delete': async (req, res, body) => {
+    const u = getUser(req);
+    if (!u) return json(res, 401, { error: 'no autenticado' });
+    db.prepare('DELETE FROM favorites WHERE id=? AND user_id=?').run(+body.id || 0, u.id);
+    json(res, 200, { favorites: listFavorites(u.id) });
   },
 
   // ------------------------------------------------ super admin

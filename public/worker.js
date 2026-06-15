@@ -50,6 +50,11 @@ self.onmessage = function (e) {
       if (!a) { self.postMessage({id: m.id, type: 'reanalyze'}); return; }
       session = new SuitPlayEngine.PlaySession(a);
       self.postMessage({id: m.id, type: 'playState', state: session.start(m.line)});
+    } else if (m.cmd === 'describe') {
+      const a = analyses.get(m.key);
+      if (!a) { self.postMessage({id: m.id, type: 'reanalyze'}); return; }
+      self.postMessage({id: m.id, type: 'describe',
+                        plan: SuitPlayEngine.autoLine(a, m.line)});
     } else if (m.cmd === 'playChoose') {
       self.postMessage({id: m.id, type: 'playState', state: session.choose(m.option)});
     } else if (m.cmd === 'playAuto') {

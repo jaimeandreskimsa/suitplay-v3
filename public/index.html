@@ -42,13 +42,20 @@
   .panel h2 { margin: 0 0 12px; font-size: 13px; font-weight: 700;
               text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
   .deck { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 12px; }
-  .chip { width: 38px; height: 48px; border-radius: 8px; border: 1.5px solid var(--line);
-          font: 600 17px var(--mono); cursor: pointer; user-select: none;
-          display: flex; align-items: center; justify-content: center;
-          background: var(--ew-soft); color: var(--ew); transition: all .12s; }
-  .chip:hover { transform: translateY(-2px); box-shadow: 0 3px 8px rgba(20,35,60,.15); }
+  .chip { width: 46px; border-radius: 8px; border: 1.5px solid var(--line);
+          user-select: none; display: flex; flex-direction: column; align-items: center;
+          gap: 3px; padding: 5px 0 4px; background: var(--ew-soft); color: var(--ew);
+          transition: background .12s, border-color .12s; }
+  .chip .rk { font: 600 18px var(--mono); line-height: 1; }
+  .chip .ns { display: flex; gap: 3px; }
+  .chip .ns button { width: 18px; height: 17px; padding: 0; border-radius: 5px;
+          border: 1px solid var(--line); background: #fff; color: var(--muted);
+          font: 700 10px var(--sans); line-height: 1; cursor: pointer; transition: all .1s; }
+  .chip .ns button:hover { border-color: var(--ink); color: var(--ink); }
   .chip.north { background: var(--north-soft); color: var(--north); border-color: var(--north); }
   .chip.south { background: var(--south-soft); color: var(--south); border-color: var(--south); }
+  .chip .ns button.on[data-to="1"] { background: var(--north); border-color: var(--north); color: #fff; }
+  .chip .ns button.on[data-to="2"] { background: var(--south); border-color: var(--south); color: #fff; }
   .legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--muted);
             margin-bottom: 14px; flex-wrap: wrap; }
   .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px;
@@ -177,6 +184,43 @@
   .pay-msg { font-size: 13px; color: var(--muted); background: var(--ew-soft);
              border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
   .hidden { display: none !important; }
+  /* ---------- tooltip ---------- */
+  .tip { position: relative; display: inline-flex; align-items: center;
+         justify-content: center; width: 15px; height: 15px; margin-left: 5px;
+         border-radius: 50%; background: var(--accent-soft); color: var(--accent);
+         font: 700 10px var(--sans); cursor: help; vertical-align: middle; }
+  .tip .tip-box { position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%);
+                  width: 260px; max-width: 70vw; background: var(--ink); color: #fff;
+                  font: 400 11.5px/1.5 var(--sans); text-transform: none; letter-spacing: 0;
+                  padding: 9px 11px; border-radius: 8px; box-shadow: 0 6px 18px rgba(20,35,60,.25);
+                  opacity: 0; visibility: hidden; transition: opacity .12s; z-index: 30;
+                  text-align: left; }
+  .tip .tip-box::after { content: ""; position: absolute; top: 100%; left: 50%;
+                  transform: translateX(-50%); border: 6px solid transparent;
+                  border-top-color: var(--ink); }
+  .tip:hover .tip-box, .tip:focus .tip-box, .tip.open .tip-box { opacity: 1; visibility: visible; }
+  /* ---------- ver detalle ---------- */
+  .detail-toggle { background: none; border: none; color: var(--accent); cursor: pointer;
+                   font: 600 12.5px var(--sans); padding: 2px 0; margin-top: 6px; }
+  /* ---------- favoritos ---------- */
+  .fav-empty { color: var(--muted); font-size: 13px; }
+  .fav-table { width: 100%; }
+  .fav-table td { border-bottom: 1px solid var(--line); padding: 6px 8px; }
+  .fav-table td.combo { font-family: var(--mono); text-align: left; }
+  .fav-table td.combo .cn { color: var(--north); font-weight: 600; }
+  .fav-table td.combo .cs { color: var(--south); font-weight: 600; }
+  .fav-take { background: var(--accent); border: none; color: #fff; font: 600 12px var(--sans);
+              padding: 5px 12px; border-radius: 7px; cursor: pointer; }
+  .fav-del { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; }
+  .fav-del:hover { color: #b3261e; }
+  /* ---------- narración de la línea ---------- */
+  .line-story { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .line-story h3 { margin: 0 0 6px; font: 700 12px var(--sans); text-transform: uppercase;
+                   letter-spacing: .6px; color: var(--muted); }
+  .line-story ol { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.6; }
+  .line-story .res-ns { color: var(--accent); font-weight: 700; }
+  .line-story .res-ew { color: #b3261e; font-weight: 700; }
+  .line-story .end { margin-top: 6px; font-weight: 650; color: var(--ink); }
 </style>
 </head>
 <body>
@@ -234,9 +278,13 @@
         <span><span class="dot" style="background:var(--north)"></span><b>Norte</b></span>
         <span><span class="dot" style="background:var(--south)"></span><b>Sur</b></span>
         <span><span class="dot" style="background:var(--ew)"></span><b>E-O (defensa)</b></span>
-        <span style="margin-left:auto">clic para asignar</span>
+        <span style="margin-left:auto">botones N/S por carta · vacío = E-O</span>
       </div>
       <div class="deck" id="deck"></div>
+      <div style="margin-bottom:12px; display:flex; gap:8px;">
+        <button class="ghost" id="btnReset" title="vaciar la selección y empezar un nuevo análisis">↺ Reiniciar selección</button>
+        <button class="ghost" id="btnFav" title="guardar esta combinación en favoritos">★ Guardar en favoritos</button>
+      </div>
       <div class="hands">
         <span class="who">Norte</span><span class="cards-n" id="handN">—</span>
         <span class="who">Sur</span><span class="cards-s" id="handS">—</span>
@@ -244,11 +292,11 @@
       </div>
       <div class="opts">
         <div>
-          <label for="vacW">Vacant places Oeste</label>
+          <label for="vacW">Vacant places Oeste<span class="tip" tabindex="0">i<span class="tip-box">In contract bridge, the Principle of Vacant Places is a rule of probability used to locate an unknown high card. It states that an unseen card is more likely to be in the opponent&#39;s hand with more &ldquo;vacant spaces&rdquo; (uncounted card slots) remaining, because they have more physical room to hold it.</span></span></label>
           <input type="number" id="vacW" value="13" min="1" max="26">
         </div>
         <div>
-          <label for="vacE">Vacant places Este</label>
+          <label for="vacE">Vacant places Este<span class="tip" tabindex="0">i<span class="tip-box">In contract bridge, the Principle of Vacant Places is a rule of probability used to locate an unknown high card. It states that an unseen card is more likely to be in the opponent&#39;s hand with more &ldquo;vacant spaces&rdquo; (uncounted card slots) remaining, because they have more physical room to hold it.</span></span></label>
           <input type="number" id="vacE" value="13" min="1" max="26">
         </div>
         <button class="calc" id="btnCalc">Calcular</button>
@@ -261,6 +309,12 @@
       </div>
     </div>
 
+    <div class="panel" id="favPanel">
+      <h2>Favoritos</h2>
+      <div id="favBox"><div class="fav-empty">Aún no guardaste combinaciones. Usa
+        “★ Guardar en favoritos”.</div></div>
+    </div>
+
     <div class="panel" id="playPanel">
       <h2>Play</h2>
       <div class="play-head">
@@ -268,8 +322,9 @@
         <select id="lineSel"><option value="">—</option></select>
         <div class="play-stats" id="playStats"></div>
       </div>
+      <div id="lineStory"></div>
       <div id="playArea"><div class="empty">pulsa Calcular: aquí podrás jugar la línea
-        truco a truco (tú llevas la defensa)</div></div>
+        baza a baza (tú llevas la defensa)</div></div>
     </div>
   </div>
 
@@ -277,7 +332,8 @@
     <div class="panel">
       <h2>Success probabilities</h2>
       <div id="goalsBox"><div class="empty">Asigna las cartas y pulsa Calcular.</div></div>
-      <div class="lineinfo" id="lineInfo"></div>
+      <button class="detail-toggle hidden" id="detailToggle">Ver detalle ▾</button>
+      <div class="lineinfo hidden" id="lineInfo"></div>
     </div>
     <div class="panel">
       <h2>West – East</h2>
@@ -286,11 +342,7 @@
   </div>
 </main>
 
-<footer>
-  SuitPlay Pro — motor exacto validado contra el SuitPlay clásico de Jeroen Warmerdam.
-  Modelo: declarante single-dummy contra defensa óptima omnisciente.
-  Análisis ilimitados con suscripción activa.
-</footer>
+<footer></footer>
 </div>
 
 <script>
@@ -349,6 +401,7 @@ function enterApp(user) {
   $('btnAdmin').classList.toggle('hidden', !me.isAdmin);
   renderPlan();
   confirmPendingPayment();
+  refreshFavs();
   if (!me.active) showPaywall();
 }
 
@@ -414,9 +467,23 @@ RANKS.forEach(r => assign[r] = 0);
 const deckEl = $('deck');
 RANKS.forEach(r => {
   const d = document.createElement('div');
-  d.className = 'chip'; d.textContent = r; d.dataset.rank = r;
-  d.title = 'clic: E-O → Norte → Sur';
-  d.addEventListener('click', () => { assign[r] = (assign[r] + 1) % 3; refreshDeck(); });
+  d.className = 'chip'; d.dataset.rank = r;
+  const rk = document.createElement('span');
+  rk.className = 'rk'; rk.textContent = r;
+  const ns = document.createElement('div');
+  ns.className = 'ns';
+  for (const to of [1, 2]) {
+    const b = document.createElement('button');
+    b.dataset.to = to; b.textContent = to === 1 ? 'N' : 'S';
+    b.title = to === 1 ? 'asignar a Norte (clic de nuevo para quitar)'
+                       : 'asignar a Sur (clic de nuevo para quitar)';
+    b.addEventListener('click', () => {
+      assign[r] = assign[r] === to ? 0 : to;   // mismo botón = quitar (vuelve a E-O)
+      refreshDeck();
+    });
+    ns.appendChild(b);
+  }
+  d.appendChild(rk); d.appendChild(ns);
   deckEl.appendChild(d);
 });
 
@@ -425,6 +492,9 @@ function refreshDeck() {
   for (const d of deckEl.children) {
     const a = assign[d.dataset.rank];
     d.className = 'chip' + (a === 1 ? ' north' : a === 2 ? ' south' : '');
+    for (const b of d.querySelectorAll('.ns button')) {
+      b.classList.toggle('on', a === +b.dataset.to);
+    }
   }
   $('handN').textContent = handStr(1) || '—';
   $('handS').textContent = handStr(2) || '—';
@@ -436,6 +506,83 @@ function refreshDeck() {
     : '';
 }
 refreshDeck();
+
+// ==================== reiniciar selección ====================
+$('btnReset').addEventListener('click', () => {
+  RANKS.forEach(r => assign[r] = 0);
+  refreshDeck();
+});
+
+// ==================== favoritos (servidor + caché local) ====================
+// Los favoritos se guardan en la cuenta del usuario (sincronizan entre
+// dispositivos). Se cachean en localStorage para mostrarlos al instante y
+// como respaldo de solo lectura si no hay red.
+const FAV_KEY = 'suitplay_favs';
+let favCache = [];
+try { favCache = JSON.parse(localStorage.getItem(FAV_KEY)) || []; } catch { favCache = []; }
+
+function cacheFavs(list) {
+  favCache = Array.isArray(list) ? list : [];
+  try { localStorage.setItem(FAV_KEY, JSON.stringify(favCache)); } catch {}
+}
+
+async function refreshFavs() {
+  try {
+    const {status, data} = await api('/api/favorites');
+    if (status === 200 && Array.isArray(data.favorites)) cacheFavs(data.favorites);
+  } catch { /* sin red: se conserva la caché local */ }
+  renderFavs();
+}
+
+function applyCombo(f) {
+  if (!f) return;
+  RANKS.forEach(r => assign[r] = 0);
+  for (const ch of (f.n || '')) if (assign[ch] !== undefined) assign[ch] = 1;
+  for (const ch of (f.s || '')) if (assign[ch] !== undefined) assign[ch] = 2;
+  $('vacW').value = f.vacW; $('vacE').value = f.vacE;
+  refreshDeck();
+}
+
+function renderFavs() {
+  const box = $('favBox');
+  if (!favCache.length) {
+    box.innerHTML = '<div class="fav-empty">Aún no guardaste combinaciones. ' +
+      'Usa “★ Guardar en favoritos”.</div>';
+    return;
+  }
+  let h = '<table class="fav-table"><tr>' +
+    '<th class="l">#</th><th class="l">Norte</th><th class="l">Sur</th><th></th><th></th></tr>';
+  favCache.forEach((f, i) => {
+    h += '<tr><td>' + (i + 1) + '</td>' +
+      '<td class="combo"><span class="cn">' + (f.n || '—') + '</span></td>' +
+      '<td class="combo"><span class="cs">' + (f.s || '—') + '</span></td>' +
+      '<td><button class="fav-take" data-i="' + i + '">Tomar</button></td>' +
+      '<td><button class="fav-del" data-del="' + (f.id ?? '') + '" title="quitar">✕</button></td></tr>';
+  });
+  h += '</table>';
+  box.innerHTML = h;
+  box.querySelectorAll('[data-i]').forEach(b =>
+    b.addEventListener('click', () => applyCombo(favCache[+b.dataset.i])));
+  box.querySelectorAll('[data-del]').forEach(b =>
+    b.addEventListener('click', async () => {
+      if (b.dataset.del === '') return;
+      try {
+        const {status, data} = await api('/api/favorites/delete', {id: +b.dataset.del});
+        if (status === 200) { cacheFavs(data.favorites); renderFavs(); }
+      } catch {}
+    }));
+}
+
+$('btnFav').addEventListener('click', async () => {
+  const n = handStr(1), s = handStr(2);
+  if (!n && !s) return;
+  const body = {n, s, vacW: +$('vacW').value || 13, vacE: +$('vacE').value || 13};
+  try {
+    const {status, data} = await api('/api/favorites', body);
+    if (status === 200) { cacheFavs(data.favorites); renderFavs(); }
+  } catch {}
+});
+renderFavs();
 
 // ==================== worker ====================
 let worker = null;
@@ -513,6 +660,11 @@ async function startCalc() {
 }
 
 $('btnCalc').addEventListener('click', startCalc);
+$('detailToggle').addEventListener('click', () => {
+  const box = $('lineInfo');
+  const open = box.classList.toggle('hidden') === false;
+  $('detailToggle').textContent = open ? 'Ocultar detalle ▴' : 'Ver detalle ▾';
+});
 $('btnCancel').addEventListener('click', () => {
   if (worker) { worker.terminate(); worker = null; pending.clear(); }
   setCalculating(false);
@@ -542,6 +694,7 @@ function render(d) {
         ' cartas) · ' + d.frontier + ' estrategias no dominadas · ' +
         (d.cached ? 'caché' : d.secs.toFixed(1) + ' s') + '</span>';
   $('lineInfo').innerHTML = li;
+  $('detailToggle').classList.remove('hidden');
 
   const labels = d.lines.map(l => l.label);
   let w = '<table class="we-table"><tr><th class="l">West – East</th><th>#</th><th>prob.</th>';
@@ -566,6 +719,7 @@ function render(d) {
   if (labels.length) {
     sel.value = labels[0];
     playCmd({cmd: 'playStart', key: currentKey, line: labels[0]});
+    describeLine(labels[0]);
   }
 }
 
@@ -576,9 +730,11 @@ $('lineSel').addEventListener('change', e => {
   const line = e.target.value;
   if (!line) {
     $('playArea').innerHTML = '<div class="empty">selecciona una línea de juego</div>';
+    describeLine('');
     return;
   }
   playCmd({cmd: 'playStart', key: currentKey, line});
+  describeLine(line);
 });
 
 function playCmd(msg) {
@@ -602,7 +758,7 @@ function seatCard(st, seat) {
 }
 
 function renderPlay(st) {
-  $('playStats').innerHTML = 'Tricks won: <b>' + st.tricksWon + '</b> · Truco ' +
+  $('playStats').innerHTML = 'Tricks won: <b>' + st.tricksWon + '</b> · Baza ' +
     st.trickNum + ' · repartos: ' + st.compat.count;
 
   let h = '';
@@ -617,7 +773,7 @@ function renderPlay(st) {
     h += '<div class="pcard' + (c ? '' : ' empty') + '">' +
          (c || (isWaiting ? '?' : '·')) + '</div></div>';
     if (seat === 'W') {
-      h += '<div class="seat c">' + (st.trick ? 'truco ' + st.trickNum : '') + '</div>';
+      h += '<div class="seat c">' + (st.trick ? 'baza ' + st.trickNum : '') + '</div>';
     }
   }
   h += '</div>';
@@ -628,7 +784,7 @@ function renderPlay(st) {
     const seat = SEAT_NAME[st.waiting.seat];
     h += '<div class="play-msg">';
     if (st.waiting.type === 'lead') {
-      h += '<span class="turn">' + seat + ' ganó el truco</span> — elige su jugada (defensa):';
+      h += '<span class="turn">' + seat + ' ganó la baza</span> — elige su jugada (defensa):';
     } else {
       h += 'Tu turno: <span class="turn">juega la carta de ' + seat + '</span> (defensa):';
     }
@@ -649,7 +805,7 @@ function renderPlay(st) {
 
   if (st.log.length) {
     h += '<div class="play-log">' + st.log.map(e =>
-      'Truco ' + e.num + ': ' + e.plays.map(p => p.seat + ':' + p.str).join(' ') +
+      'Baza ' + e.num + ': ' + e.plays.map(p => p.seat + ':' + p.str).join(' ') +
       ' → <span class="' + (e.ns ? 'win-ns' : 'win-ew') + '">' + (e.ns ? 'NS' : 'EO') + '</span>'
     ).join('<br>') + '</div>';
   }
@@ -671,6 +827,31 @@ function renderPlay(st) {
   if (b && st.canBack) b.addEventListener('click', () => playCmd({cmd: 'playBack', key: currentKey}));
   const au = $('pAuto');
   if (au) au.addEventListener('click', () => playCmd({cmd: 'playAuto', key: currentKey}));
+}
+
+// ==================== narración de la línea (auto) ====================
+function describeLine(line) {
+  const box = $('lineStory');
+  if (!line) { box.innerHTML = ''; return; }
+  send({cmd: 'describe', key: currentKey, line}, resp => {
+    if (resp.type !== 'describe') { box.innerHTML = ''; return; }
+    renderStory(resp.plan);
+  });
+}
+
+function renderStory(plan) {
+  const seat = {N: 'Norte', S: 'Sur', E: 'Este', W: 'Oeste'};
+  let h = '<div class="line-story"><h3>Cómo se juega la línea ' + plan.line +
+          ' (contra la defensa natural)</h3><ol>';
+  for (const t of plan.tricks) {
+    const plays = t.plays.map(p => seat[p.seat] + ' <b>' + p.str + '</b>').join(', ');
+    h += '<li>' + plays + ' → <span class="' + (t.ns ? 'res-ns' : 'res-ew') + '">' +
+         (t.ns ? 'gana NS' : 'gana la defensa') + '</span></li>';
+  }
+  h += '</ol>';
+  if (plan.finalNote) h += '<div class="end">' + plan.finalNote + '</div>';
+  h += '</div>';
+  $('lineStory').innerHTML = h;
 }
 
 // ==================== arranque ====================
